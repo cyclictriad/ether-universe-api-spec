@@ -13,25 +13,23 @@
 **Authentication Flow:**
 1. User connects wallet and signs authentication challenge
 2. System checks if wallet address exists in database
-3. If new user: Returns limited token with `kyc_required: true` status
-4. User must submit KYC documents (ID card/passport) to create account
-5. OCR automatically extracts user information (name, DOB, nationality, etc.)
-6. Upon KYC approval, user gains full access to trading features
+3. System initiates a user based on the wallet_id
+4. If new user: Returns limited token with `kyc_required: true` status
+5. User must submit KYC documents (ID card/passport) to create account
+6. OCR automatically extracts user information (name, DOB, nationality, etc.)
+7. Upon KYC approval, user gains full access to trading features
 
-**Key Principle:** No transactions (swaps, transfers, trading) are allowed until KYC verification is completed and approved.
+**Key Principle:** No transactions (orders, deposits) on live accounts are allowed until KYC verification is completed and approved. Demo accounts can be used without KYC.
 
 ---
 
 ## Table of Contents
 1. [Authentication & KYC](#authentication--kyc)
-2. [KYC Management](#kyc-management)
+2. [User Management](#user-management)
 3. [Wallet Operations](#wallet-operations)
-4. [Transaction Management](#transaction-management)
-5. [Trading Operations](#trading-operations)
-6. [Token Information](#token-information)
-7. [WebSocket Feeds](#websocket-feeds)
-8. [Error Responses](#error-responses)
-9. [Glossary](#glossary)
+4. [Trading Operations](#trading-operations)
+5. [Market Data](#market-data)
+6. [Settings & Security](#settings--security)
 
 ---
 
@@ -43,8 +41,7 @@
 **Request:**
 ```json
 {
-  "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-  "chain_id": 1
+  "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
 }
 ```
 
@@ -57,18 +54,6 @@
 }
 ```
 
-**Frontend Usage:**
-```javascript
-// 1. Get challenge
-const { challenge_id, message } = await api.post('/auth/wallet/challenge', {
-  wallet_address: address,
-  chain_id: 1
-});
-
-// 2. User signs in wallet
-const signature = await wallet.signMessage(message);
-```
-
 ---
 
 ### 2. Verify Signature & Get Token
@@ -79,8 +64,7 @@ const signature = await wallet.signMessage(message);
 {
   "challenge_id": "chall_abc123xyz",
   "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-  "signature": "0x8f3d2c1b...",
-  "chain_id": 1
+  "signature": "0x8f3d2c1b..."
 }
 ```
 
@@ -96,7 +80,8 @@ const signature = await wallet.signMessage(message);
     "is_new_user": false,
     "kyc_status": "approved",
     "kyc_verified_at": "2024-06-20T14:30:00Z",
-    "full_name": "John Doe",
+    "first_name": "John",
+    "last_name": "Doe",
     "created_at": "2024-06-15T10:30:00Z",
     "can_trade": true
   }
@@ -115,7 +100,8 @@ const signature = await wallet.signMessage(message);
     "is_new_user": false,
     "kyc_status": "pending",
     "kyc_submitted_at": "2025-10-01T10:00:00Z",
-    "full_name": "John Doe",
+    "first_name": null,
+    "last_name": null,
     "created_at": "2025-09-28T08:15:00Z",
     "can_trade": false
   }
@@ -135,7 +121,8 @@ const signature = await wallet.signMessage(message);
     "kyc_status": "rejected",
     "kyc_rejected_at": "2025-09-30T16:45:00Z",
     "rejection_reason": "Document image quality insufficient",
-    "full_name": null,
+    "first_name": null,
+    "last_name": null,
     "created_at": "2025-09-28T08:15:00Z",
     "can_trade": false,
     "can_resubmit": true
@@ -155,53 +142,17 @@ const signature = await wallet.signMessage(message);
     "is_new_user": true,
     "kyc_status": "not_submitted",
     "kyc_required": true,
-    "full_name": null,
+    "first_name": null,
+    "last_name": null,
     "created_at": "2025-10-01T12:00:00Z",
     "can_trade": false
   }
 }
 ```
 
-
 ---
 
-### 3. Get User Profile
-**Endpoint:** `GET /auth/profile`  
-**Headers:** `Authorization: Bearer <token>`
-
-**Response (KYC Approved):**
-```json
-{
-  "user_id": "usr_12345",
-  "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-  "kyc_status": "approved",
-  "kyc_verified_at": "2024-06-20T14:30:00Z",
-  "full_name": "John Doe",
-  "date_of_birth": "1990-05-15",
-  "nationality": "US",
-  "document_type": "passport",
-  "document_number": "P12345678",
-  "created_at": "2024-06-15T10:30:00Z",
-  "can_trade": true
-}
-```
-
-**Response (KYC Not Submitted):**
-```json
-{
-  "user_id": "usr_67890",
-  "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-  "kyc_status": "not_submitted",
-  "kyc_required": true,
-  "full_name": null,
-  "created_at": "2025-10-01T12:00:00Z",
-  "can_trade": false
-}
-```
-
----
-
-### 4. Refresh Token
+### 3. Refresh Token
 **Endpoint:** `POST /auth/token/refresh`
 
 **Request:**
@@ -221,7 +172,7 @@ const signature = await wallet.signMessage(message);
 
 ---
 
-### 5. Logout
+### 4. Logout
 **Endpoint:** `POST /auth/logout`  
 **Headers:** `Authorization: Bearer <token>`
 
@@ -236,9 +187,7 @@ const signature = await wallet.signMessage(message);
 
 ---
 
-## KYC Management
-
-### 6. Submit KYC Documents
+### 5. Submit KYC Documents
 **Endpoint:** `POST /kyc/submit`  
 **Headers:** `Authorization: Bearer <token>`  
 **Content-Type:** `multipart/form-data`
@@ -258,7 +207,8 @@ document_back: [File] (JPEG/PNG, max 10MB) - Required for national_id and driver
   "submitted_at": "2025-10-01T12:15:00Z",
   "estimated_processing_time": "2-24 hours",
   "ocr_extracted_data": {
-    "full_name": "John Doe",
+    "first_name": "John",
+    "last_name": "Doe",
     "date_of_birth": "1990-05-15",
     "nationality": "US",
     "document_number": "P12345678",
@@ -281,10 +231,9 @@ document_back: [File] (JPEG/PNG, max 10MB) - Required for national_id and driver
 }
 ```
 
-
 ---
 
-### 7. Get KYC Status
+### 6. Get KYC Status
 **Endpoint:** `GET /kyc/status`  
 **Headers:** `Authorization: Bearer <token>`
 
@@ -308,7 +257,8 @@ document_back: [File] (JPEG/PNG, max 10MB) - Required for national_id and driver
   "submitted_at": "2025-10-01T12:15:00Z",
   "approved_at": "2025-10-01T16:30:00Z",
   "verified_data": {
-    "full_name": "John Doe",
+    "first_name": "John",
+    "last_name": "Doe",
     "date_of_birth": "1990-05-15",
     "nationality": "US"
   },
@@ -344,24 +294,7 @@ document_back: [File] (JPEG/PNG, max 10MB) - Required for national_id and driver
 
 ---
 
-### 8. Resubmit KYC (After Rejection)
-**Endpoint:** `POST /kyc/resubmit`  
-**Headers:** `Authorization: Bearer <token>`  
-**Content-Type:** `multipart/form-data`
-
-Same request/response format as `/kyc/submit`.
-
-**Additional Response Field:**
-```json
-{
-  "previous_rejection_reason": "Document image quality insufficient",
-  "attempt_number": 2
-}
-```
-
----
-
-### 9. Get KYC History
+### 7. Get KYC History
 **Endpoint:** `GET /kyc/history`  
 **Headers:** `Authorization: Bearer <token>`
 
@@ -388,308 +321,194 @@ Same request/response format as `/kyc/submit`.
 
 ---
 
-## Wallet Operations
+## User Management
+
+### 8. Get User Profile
+**Endpoint:** `GET /user/profile`  
+**Headers:** `Authorization: Bearer <token>`
+
+**Response (KYC Approved):**
+```json
+{
+  "user_id": "usr_12345",
+  "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+  "kyc_status": "approved",
+  "kyc_verified_at": "2024-06-20T14:30:00Z",
+  "first_name": "John",
+  "last_name": "Doe",
+  "date_of_birth": "1990-05-15",
+  "nationality": "US",
+  "document_type": "passport",
+  "document_number": "P12345678",
+  "created_at": "2024-06-15T10:30:00Z",
+  "can_trade": true
+}
+```
+
+**Response (KYC Not Submitted):**
+```json
+{
+  "user_id": "usr_67890",
+  "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+  "kyc_status": "not_submitted",
+  "kyc_required": true,
+  "first_name": null,
+  "last_name": null,
+  "created_at": "2025-10-01T12:00:00Z",
+  "can_trade": false
+}
+```
+
+---
+
+### 9. Update User Profile
+**Endpoint:** `PUT /user/profile`  
+**Headers:** `Authorization: Bearer <token>`
+
+**Request:**
+```json
+{
+  "first_name": "John",
+  "last_name": "Doe"
+}
+```
+
+**Response:**
+```json
+{
+  "user_id": "usr_12345",
+  "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+  "kyc_status": "approved",
+  "kyc_verified_at": "2024-06-20T14:30:00Z",
+  "first_name": "John",
+  "last_name": "Doe",
+  "date_of_birth": "1990-05-15",
+  "nationality": "US",
+  "document_type": "passport",
+  "document_number": "P12345678",
+  "created_at": "2024-06-15T10:30:00Z",
+  "can_trade": true
+}
+```
+
+---
+
+### 10. Get Platform Activities
+**Endpoint:** `GET /user/platform-activities`  
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+```json
+{
+  "user_id": "usr_12345",
+  "registered_on": "2024-01-01T00:00:00Z",
+  "last_login": "2025-10-01T12:00:00Z",
+  "last_deposit": {
+    "amount": "100.00",
+    "currency": "USDT",
+    "timestamp": "2025-09-30T10:00:00Z"
+  },
+  "last_withdrawal": {
+    "amount": "2000.00",
+    "currency": "USDT",
+    "timestamp": "2025-09-28T14:30:00Z"
+  }
+}
+```
+
+---
+
 ## Wallet Operations
 
-### 10. Get Wallet Balances
+### 11. Get Wallet Balances
 **Endpoint:** `GET /wallet/balances`  
 **Headers:** `Authorization: Bearer <token>`
 
 **Query Parameters:**
-- `chain_id` (optional): Filter by chain (1, 56, 137)
 - `include_zero_balances` (optional): Default false
 
 **Response:**
 ```json
 {
-  "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-  "balances": [
+  "wallets": [
     {
-      "chain_id": 1,
-      "chain_name": "Ethereum",
-      "native": {
-        "symbol": "ETH",
-        "balance": "2.456789012345678901",
-        "balance_usd": "4913.58",
-        "price_usd": "2000.00"
-      },
-      "tokens": [
-        {
-          "contract_address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-          "symbol": "USDT",
-          "name": "Tether USD",
-          "decimals": 6,
-          "balance": "5000.000000",
-          "balance_usd": "5000.00",
-          "price_usd": "1.00",
-          "logo_url": "https://assets.trustwallet.com/.../logo.png"
-        }
-      ]
+      "wallet_id": 24,
+      "pair_id": 20,
+      "symbol": "USDT",
+      "name": "Tether USD",
+      "decimals": 6,
+      "balance": "5000.000000",
+      "balance_usd": "5000.00",
+      "price_usd": "1.00"
+    },
+    {
+      "wallet_id": 25,
+      "pair_id": 1,
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "decimals": 8,
+      "balance": "0.05000000",
+      "balance_usd": "5000.00",
+      "price_usd": "100000.00"
     }
   ],
-  "total_value_usd": "9913.58",
-  "last_updated": "2025-10-01T12:05:00Z"
+  "total_balance_usd": "10000.00"
 }
 ```
 
 ---
 
-### 11. Get Transaction History
-**Endpoint:** `GET /wallet/transactions`  
+### 12. Get Wallet Addresses
+**Endpoint:** `GET /wallet/get-wallets`  
 **Headers:** `Authorization: Bearer <token>`
-
-**Query Parameters:**
-- `chain_id` (required): 1, 56, or 137
-- `limit` (optional): Default 50, max 100
-- `offset` (optional): Default 0
-- `type` (optional): `transfer`, `swap`, `approve`, `contract_interaction`
 
 **Response:**
 ```json
 {
-  "transactions": [
+  "wallets": [
     {
-      "tx_hash": "0x1234567890abcdef...",
-      "chain_id": 1,
-      "type": "swap",
-      "status": "confirmed",
-      "from_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-      "to_address": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
-      "block_number": 18234567,
-      "timestamp": "2025-10-01T11:45:00Z",
-      "gas_used": "187234",
-      "transaction_fee_usd": "11.23",
-      "actions": [
-        {
-          "type": "token_swap",
-          "token_in": {
-            "symbol": "USDT",
-            "amount": "1000.0"
-          },
-          "token_out": {
-            "symbol": "WETH",
-            "amount": "0.5"
-          }
-        }
-      ],
-      "explorer_url": "https://etherscan.io/tx/0x1234..."
+      "wallet_id": 1,
+      "pair_id": 4,
+      "symbol": "BTC",
+      "address": "0xbfbff...",
+      "network": "Bitcoin"
+    },
+    {
+      "wallet_id": 2,
+      "pair_id": 20,
+      "symbol": "USDT",
+      "address": "0xabc123...",
+      "network": "Ethereum (ERC20)"
     }
-  ],
-  "pagination": {
-    "total": 347,
-    "limit": 50,
-    "offset": 0
-  }
+  ]
 }
 ```
 
 ---
 
-## Transaction Management
-
-### 12. Prepare Transaction
-**Endpoint:** `POST /transactions/prepare`  
+### 13. Deposit to Wallet
+**Endpoint:** `POST /wallet/deposit`  
 **Headers:** `Authorization: Bearer <token>`
 
 **Request:**
 ```json
 {
-  "chain_id": 1,
-  "action": "swap",
-  "parameters": {
-    "token_in": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-    "token_out": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-    "amount_in": "1000000000",
-    "slippage_tolerance": 0.5,
-    "deadline_minutes": 20
-  }
+  "wallet_id": 24,
+  "amount": 3
 }
 ```
 
 **Response:**
 ```json
 {
-  "transaction_id": "tx_prep_abc123",
-  "unsigned_transaction": {
-    "from": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-    "to": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
-    "data": "0x38ed173900000000...",
-    "value": "0x0",
-    "gasLimit": "0x30d40",
-    "maxFeePerGas": "0x6fc23ac00",
-    "maxPriorityFeePerGas": "0x77359400",
-    "nonce": 45,
-    "chainId": 1,
-    "type": 2
-  },
-  "summary": {
-    "action": "Swap 1000 USDT for ~0.5 WETH",
-    "expected_output": "0.500000000000000000",
-    "minimum_output": "0.497500000000000000",
-    "price_impact": "0.08",
-    "gas_estimate_usd": "12.00"
-  },
-  "expires_at": "2025-10-01T12:20:00Z"
-}
-```
-
-**Frontend Usage:**
-```javascript
-// 1. Prepare transaction
-const { transaction_id, unsigned_transaction } = await api.post('/transactions/prepare', {
-  chain_id: 1,
-  action: 'swap',
-  parameters: { token_in, token_out, amount_in, slippage_tolerance: 0.5 }
-});
-
-// 2. User signs in wallet
-const txHash = await wallet.sendTransaction(unsigned_transaction);
-
-// 3. Submit to backend
-await api.post('/transactions/submit', { transaction_id, tx_hash: txHash });
-```
-
----
-
-### 13. Check Token Allowance
-**Endpoint:** `GET /transactions/check-allowance`  
-**Headers:** `Authorization: Bearer <token>`
-
-**Query Parameters:**
-- `chain_id` (required)
-- `token_address` (required)
-- `spender_address` (required)
-- `amount` (required): Amount in smallest unit
-
-**Response:**
-```json
-{
-  "has_sufficient_allowance": false,
-  "current_allowance": "0",
-  "required_allowance": "1000000000",
-  "needs_approval": true
-}
-```
-
----
-
-### 14. Prepare Approval Transaction
-**Endpoint:** `POST /transactions/prepare-approval`  
-**Headers:** `Authorization: Bearer <token>`
-
-**Request:**
-```json
-{
-  "chain_id": 1,
-  "token_address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-  "spender_address": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
-  "amount": "unlimited"
-}
-```
-
-**Response:**
-```json
-{
-  "transaction_id": "tx_prep_approval_xyz",
-  "unsigned_transaction": {
-    "from": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-    "to": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-    "data": "0x095ea7b3000000...",
-    "value": "0x0",
-    "gasLimit": "0x10000",
-    "maxFeePerGas": "0x6fc23ac00",
-    "maxPriorityFeePerGas": "0x77359400",
-    "nonce": 44,
-    "chainId": 1,
-    "type": 2
-  },
-  "summary": {
-    "action": "Approve USDT spending",
-    "amount": "Unlimited",
-    "gas_estimate_usd": "3.90"
-  },
-  "expires_at": "2025-10-01T12:20:00Z"
-}
-```
-
----
-
-### 15. Submit Transaction
-**Endpoint:** `POST /transactions/submit`  
-**Headers:** `Authorization: Bearer <token>`
-
-**Request:**
-```json
-{
-  "transaction_id": "tx_prep_abc123",
-  "tx_hash": "0x9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba"
-}
-```
-
-**Response:**
-```json
-{
-  "transaction_id": "tx_prep_abc123",
-  "tx_hash": "0x9876543210fedcba...",
-  "status": "pending",
-  "submitted_at": "2025-10-01T12:05:30Z",
-  "explorer_url": "https://etherscan.io/tx/0x9876543210fedcba..."
-}
-```
-
----
-
-### 16. Get Transaction Status
-**Endpoint:** `GET /transactions/{tx_hash}/status`  
-**Headers:** `Authorization: Bearer <token>`
-
-**Query Parameters:**
-- `chain_id` (required)
-
-**Response (Pending):**
-```json
-{
-  "tx_hash": "0x9876543210fedcba...",
-  "status": "pending",
-  "submitted_at": "2025-10-01T12:05:30Z",
-  "confirmations": 0,
-  "estimated_confirmation_time": "20s"
-}
-```
-
-**Response (Confirmed):**
-```json
-{
-  "tx_hash": "0x9876543210fedcba...",
-  "status": "confirmed",
-  "submitted_at": "2025-10-01T12:05:30Z",
-  "confirmed_at": "2025-10-01T12:06:15Z",
-  "confirmations": 15,
-  "block_number": 18234567,
-  "gas_used": "187234",
-  "transaction_fee_usd": "10.67",
-  "execution_details": {
-    "success": true,
-    "token_in": "USDT",
-    "amount_in": "1000.0",
-    "token_out": "WETH",
-    "amount_out": "0.500123456789012345"
-  }
-}
-```
-
-**Response (Failed):**
-```json
-{
-  "tx_hash": "0x9876543210fedcba...",
-  "status": "failed",
-  "confirmed_at": "2025-10-01T12:06:15Z",
-  "block_number": 18234567,
-  "transaction_fee_usd": "2.57",
-  "error": {
-    "code": "EXECUTION_REVERTED",
-    "message": "Slippage tolerance exceeded"
-  }
+  "deposit_id": "dep_abc123",
+  "wallet_id": 24,
+  "pair_id": 20,
+  "symbol": "USDT",
+  "amount": "3.000000",
+  "amount_usd": "3.00",
+  "status": "completed",
+  "created_at": "2025-10-01T12:30:00Z"
 }
 ```
 
@@ -697,33 +516,39 @@ await api.post('/transactions/submit', { transaction_id, tx_hash: txHash });
 
 ## Trading Operations
 
-### 17. Get Supported Trading Pairs
-**Endpoint:** `GET /trading/pairs`  
+### 14. Get User Accounts
+**Endpoint:** `GET /trading/accounts`  
 **Headers:** `Authorization: Bearer <token>`
-
-**Query Parameters:**
-- `chain_id` (optional): Filter by chain
-- `search` (optional): Search by symbol
 
 **Response:**
 ```json
 {
-  "pairs": [
+  "accounts": [
     {
-      "pair_id": "WETH_USDT_1",
-      "chain_id": 1,
-      "base_token": {
-        "symbol": "WETH",
-        "contract": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-        "decimals": 18
-      },
-      "quote_token": {
-        "symbol": "USDT",
-        "contract": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-        "decimals": 6
-      },
-      "liquidity_usd": "45678901.23",
-      "volume_24h_usd": "12345678.90"
+      "id": 1,
+      "user_id": 1,
+      "account_type": "demo",
+      "balance": 10000,
+      "equity": 10000,
+      "margin": 0,
+      "free_margin": 10000,
+      "margin_level": 0,
+      "is_active": true,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": 2,
+      "user_id": 1,
+      "account_type": "live",
+      "balance": 5000,
+      "equity": 5120,
+      "margin": 500,
+      "free_margin": 4620,
+      "margin_level": 1024,
+      "is_active": true,
+      "created_at": "2024-06-20T00:00:00Z",
+      "updated_at": "2025-10-01T12:00:00Z"
     }
   ]
 }
@@ -731,101 +556,33 @@ await api.post('/transactions/submit', { transaction_id, tx_hash: txHash });
 
 ---
 
-### 18. Get Token Price
-**Endpoint:** `GET /trading/price`  
-**Headers:** `Authorization: Bearer <token>`
-
-**Query Parameters:**
-- `token_in` (required): Contract address
-- `token_out` (required): Contract address
-- `chain_id` (required)
-- `amount_in` (optional): For calculating price impact
-
-**Response:**
-```json
-{
-  "token_in": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-  "token_out": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-  "exchange_rate": "0.0005",
-  "inverse_rate": "2000.0",
-  "price_usd": {
-    "token_in": "1.00",
-    "token_out": "2000.00"
-  },
-  "price_impact": "0.08",
-  "updated_at": "2025-10-01T12:05:45Z"
-}
-```
-
----
-
-### 19. Get Order History
+### 15. Get Orders
 **Endpoint:** `GET /trading/orders`  
 **Headers:** `Authorization: Bearer <token>`
 
 **Query Parameters:**
-- `chain_id` (optional)
-- `status` (optional): `pending`, `completed`, `failed`
-- `limit` (optional): Default 50
-- `offset` (optional)
+- `account_id` (optional): Filter by account
+- `status` (optional): Filter by status (open, completed, cancelled)
 
 **Response:**
 ```json
 {
   "orders": [
     {
-      "order_id": "ord_abc123",
-      "tx_hash": "0x9876543210fedcba...",
-      "chain_id": 1,
-      "type": "swap",
+      "id": 1,
+      "user_id": 1,
+      "account_id": 1,
+      "pair_id": 4,
+      "pair_symbol": "BTC/USDT",
+      "type": "long",
+      "amount": 0.1,
+      "price": 50000,
+      "total_value": 5000,
+      "leverage": 1,
       "status": "completed",
-      "token_in": {
-        "symbol": "USDT",
-        "amount": "1000.0"
-      },
-      "token_out": {
-        "symbol": "WETH",
-        "amount": "0.500123456789012345"
-      },
-      "gas_fee_usd": "10.67",
-      "created_at": "2025-10-01T12:05:00Z",
-      "executed_at": "2025-10-01T12:06:15Z"
-    }
-  ],
-  "pagination": {
-    "total": 89,
-    "limit": 50,
-    "offset": 0
-  }
-}
-```
-
----
-
-## Token Information
-
-### 20. Search Tokens
-**Endpoint:** `GET /tokens/search`  
-**Headers:** `Authorization: Bearer <token>`
-
-**Query Parameters:**
-- `query` (required): Token symbol or name
-- `chain_id` (optional): Filter by chain
-- `limit` (optional): Default 20
-
-**Response:**
-```json
-{
-  "tokens": [
-    {
-      "contract_address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-      "symbol": "USDT",
-      "name": "Tether USD",
-      "decimals": 6,
-      "chain_id": 1,
-      "logo_url": "https://assets.trustwallet.com/.../logo.png",
-      "price_usd": "1.00",
-      "is_verified": true
+      "profit_loss": 250.50,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
     }
   ]
 }
@@ -833,203 +590,319 @@ await api.post('/transactions/submit', { transaction_id, tx_hash: txHash });
 
 ---
 
-### 21. Get Token Details
-**Endpoint:** `GET /tokens/{contract_address}`  
+### 16. Create Order
+**Endpoint:** `POST /trading/orders`  
 **Headers:** `Authorization: Bearer <token>`
 
-**Query Parameters:**
-- `chain_id` (required)
+**Request:**
+```json
+{
+  "account_id": 3,
+  "pair_id": 1,
+  "type": "long",
+  "amount_usdt": 2000,
+  "leverage": 1,
+  "delivery_time": "30s",
+  "price_range": 20
+}
+```
 
 **Response:**
 ```json
 {
-  "contract_address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-  "symbol": "USDT",
-  "name": "Tether USD",
-  "decimals": 6,
-  "chain_id": 1,
-  "logo_url": "https://assets.trustwallet.com/.../logo.png",
-  "price_usd": "1.00",
-  "price_change_24h": "0.02",
-  "volume_24h_usd": "45678901234",
-  "market_cap_usd": "83456789012",
-  "is_verified": true
+  "id": 5,
+  "user_id": 1,
+  "account_id": 3,
+  "pair_id": 1,
+  "pair_symbol": "BTC/USDT",
+  "type": "long",
+  "amount_usdt": 2000,
+  "leverage": 1,
+  "entry_price": 100000.00,
+  "delivery_time": "30s",
+  "price_range": 20,
+  "status": "open",
+  "created_at": "2025-10-01T12:30:00Z"
 }
 ```
 
 ---
 
-## WebSocket Feeds
+### 17. Get Profit Statistics
+**Endpoint:** `GET /trading/profit-statistics`  
+**Headers:** `Authorization: Bearer <token>`
 
-### Connection
-**WebSocket URL:** `wss://api.yourapp.com/ws/v1`
+**Query Parameters:**
+- `account_id` (required): Account to get statistics for
+- `start_date` (optional): ISO 8601 date
+- `end_date` (optional): ISO 8601 date
 
-**Authentication:** Send JWT as first message
+**Response:**
 ```json
 {
-  "action": "authenticate",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  "account_id": 3,
+  "statistics": [
+    [1727789022, 0],
+    [1727789025, 10],
+    [1727789032, -5],
+    [1727789042, 15]
+  ]
 }
 ```
 
 ---
 
-###  Subscribe to Price Feed
-**Subscribe Message:**
+## Market Data
+
+### 18. Get Trading Pairs
+**Endpoint:** `GET /market/trading-pairs`  
+**Headers:** `Authorization: Bearer <token>`
+
+**Query Parameters:**
+- `category_id` (optional): Filter by category
+
+**Response:**
 ```json
 {
-  "action": "subscribe",
-  "channel": "prices",
-  "pairs": ["WETH_USDT_1", "WBNB_USDT_56"]
-}
-```
-
-**Price Update Message:**
-```json
-{
-  "channel": "prices",
-  "pair_id": "WETH_USDT_1",
-  "price": "2000.45",
-  "change_24h": "2.34",
-  "timestamp": "2025-10-01T12:05:50Z"
-}
-```
-
-**Unsubscribe Message:**
-```json
-{
-  "action": "unsubscribe",
-  "channel": "prices",
-  "pairs": ["WETH_USDT_1"]
-}
-```
-
----
-
-### Subscribe to Transaction Updates
-**Subscribe Message:**
-```json
-{
-  "action": "subscribe",
-  "channel": "transactions",
-  "tx_hash": "0x9876543210fedcba..."
-}
-```
-
-**Status Update Message:**
-```json
-{
-  "channel": "transactions",
-  "tx_hash": "0x9876543210fedcba...",
-  "status": "confirmed",
-  "confirmations": 12,
-  "block_number": 18234567
-}
-```
-
----
-
-## Error Responses
-
-All errors follow this format:
-
-```json
-{
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable error message",
-    "details": {}
-  }
-}
-```
-
-### Common Error Codes
-
-| HTTP Status | Error Code | Meaning | Frontend Action |
-|-------------|-----------|---------|-----------------|
-| 400 | `INVALID_REQUEST` | Malformed request | Show validation error |
-| 400 | `INSUFFICIENT_BALANCE` | Not enough funds | Show "Insufficient balance" |
-| 400 | `INSUFFICIENT_LIQUIDITY` | Low DEX liquidity | Suggest smaller amount |
-| 400 | `SLIPPAGE_EXCEEDED` | Price moved too much | Increase slippage or retry |
-| 400 | `UNSUPPORTED_TOKEN` | Token not available | Show "Token not supported" |
-| 401 | `INVALID_SIGNATURE` | Signature verification failed | Re-authenticate |
-| 401 | `UNAUTHORIZED` | Missing/invalid token | Redirect to login |
-| 404 | `NOT_FOUND` | Resource doesn't exist | Show 404 page |
-| 409 | `DUPLICATE_REQUEST` | Already submitted | Show existing tx status |
-| 410 | `EXPIRED` | Prepared tx expired | Prepare new transaction |
-| 429 | `RATE_LIMIT_EXCEEDED` | Too many requests | Show "Please wait" message |
-| 500 | `INTERNAL_SERVER_ERROR` | Server error | Show error, suggest retry |
-| 502 | `BLOCKCHAIN_RPC_ERROR` | Blockchain unavailable | Show "Network issue" |
-
-### Error Response Examples
-
-**Insufficient Balance:**
-```json
-{
-  "error": {
-    "code": "INSUFFICIENT_BALANCE",
-    "message": "Insufficient balance for transaction",
-    "details": {
-      "required": "1000.0 USDT",
-      "available": "500.0 USDT"
+  "trading_pairs": [
+    {
+      "id": 1,
+      "symbol": "BTC/USD",
+      "base_asset": "BTC",
+      "quote_asset": "USD",
+      "name": "Bitcoin",
+      "value_usd": 100000,
+      "percentage_change": 2.34,
+      "high_24h": 101500,
+      "low_24h": 98000,
+      "volume_24h": 125000000,
+      "category_id": 1,
+      "category": "Digital Assets",
+      "logo_url": "https://assets.trustwallet.com/.../logo.png"
+    },
+    {
+      "id": 2,
+      "symbol": "ETH/USD",
+      "base_asset": "ETH",
+      "quote_asset": "USD",
+      "name": "Ethereum",
+      "value_usd": 3500,
+      "percentage_change": -1.5,
+      "high_24h": 3600,
+      "low_24h": 3450,
+      "volume_24h": 85000000,
+      "category_id": 1,
+      "category": "Digital Assets",
+      "logo_url": "https://assets.trustwallet.com/.../logo.png"
     }
-  }
-}
-```
-
-**Invalid Signature:**
-```json
-{
-  "error": {
-    "code": "INVALID_SIGNATURE",
-    "message": "Signature verification failed",
-    "details": {
-      "expected_signer": "0x742d35Cc...",
-      "recovered_signer": "0x123456..."
-    }
-  }
-}
-```
-
-**Rate Limit:**
-```json
-{
-  "error": {
-    "code": "RATE_LIMIT_EXCEEDED",
-    "message": "Too many requests. Please try again in 30 seconds.",
-    "details": {
-      "retry_after": 30
-    }
-  }
+  ]
 }
 ```
 
 ---
 
-## Glossary
+### 19. Get Price Data
+**Endpoint:** `GET /market/price-data/{pair_id}`  
+**Headers:** `Authorization: Bearer <token>`
 
-| Term | Definition |
-|------|------------|
-| **dApp** | Decentralized Application - blockchain-based app where users control their own assets |
-| **Non-Custodial** | User keeps control of private keys; platform never accesses them |
-| **Wallet Address** | Unique identifier for blockchain account (e.g., `0x742d35Cc...`) |
-| **Chain ID** | Identifier for blockchain network (1=Ethereum, 56=BSC, 137=Polygon) |
-| **Token** | Digital asset on blockchain (ERC-20 standard) |
-| **Contract Address** | Smart contract location on blockchain |
-| **Gas** | Fee paid to process blockchain transactions |
-| **Nonce** | Transaction counter ensuring correct order |
-| **Slippage** | Maximum acceptable price change (e.g., 0.5% = 0.5) |
-| **Wei** | Smallest unit of ETH (1 ETH = 1,000,000,000,000,000,000 wei) |
-| **Decimals** | Number of decimal places for token (ETH=18, USDT=6) |
-| **Approval** | Permission for contract to spend your tokens |
-| **DEX** | Decentralized Exchange (e.g., Uniswap, PancakeSwap) |
-| **Liquidity** | Available trading volume in a pair |
-| **Price Impact** | How much your trade affects the price |
-| **tx_hash** | Unique transaction identifier on blockchain |
-| **Block Number** | Sequential number of block containing transaction |
-| **Confirmations** | Number of blocks added after your transaction |
-| **SIWE** | Sign-In With Ethereum - authentication using wallet signature |
-| **JWT** | JSON Web Token - used for API authentication |
+**Query Parameters:**
+- `start_time` (required): Unix timestamp in seconds
+- `end_time` (optional): Unix timestamp in seconds, default now
+- `interval` (optional): `1m`, `5m`, `15m`, `1h`, `4h`, `1d` (default: `1h`)
+
+**Response:**
+```json
+{
+  "pair_id": 1,
+  "symbol": "BTC/USD",
+  "interval": "1h",
+  "price_data": [
+    [1727789022, 100000],
+    [1727789025, 100010],
+    [1727789032, 99995],
+    [1727789042, 100050]
+  ]
+}
+```
+
+---
+
+### 20. Get Market Overview
+**Endpoint:** `GET /market/overview`  
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+```json
+{
+  "total_market_cap": "2500000000000.00",
+  "total_volume_24h": "125000000000.00",
+  "market_change_24h": 1.8,
+  "btc_dominance": 52.3,
+  "top_gainers": [
+    {
+      "pair_id": 5,
+      "symbol": "SOL/USD",
+      "percentage_change": 8.5
+    }
+  ],
+  "top_losers": [
+    {
+      "pair_id": 12,
+      "symbol": "ADA/USD",
+      "percentage_change": -5.2
+    }
+  ]
+}
+```
+
+---
+
+## Settings & Security
+
+### 21. Get User Settings
+**Endpoint:** `GET /settings`  
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+```json
+{
+  "theme": "dark",
+  "language": "en",
+  "notifications": true,
+  "email_alerts": true,
+  "sms_alerts": false,
+  "two_factor_auth": false,
+  "risk_management": "high",
+  "max_leverage": 20,
+  "auto_close_trades": false
+}
+```
+
+---
+
+### 22. Update User Settings
+**Endpoint:** `PUT /settings`  
+**Headers:** `Authorization: Bearer <token>`
+
+**Request:**
+```json
+{
+  "theme": "dark",
+  "language": "en",
+  "notifications": true,
+  "email_alerts": true,
+  "sms_alerts": false,
+  "two_factor_auth": false,
+  "risk_management": "high",
+  "max_leverage": 20,
+  "auto_close_trades": false
+}
+```
+
+**Response:**
+```json
+{
+  "theme": "dark",
+  "language": "en",
+  "notifications": true,
+  "email_alerts": true,
+  "sms_alerts": false,
+  "two_factor_auth": false,
+  "risk_management": "high",
+  "max_leverage": 20,
+  "auto_close_trades": false
+}
+```
+
+---
+
+### 23. Get User Security
+**Endpoint:** `GET /security`  
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+```json
+{
+  "requirePin": false,
+  "privacyMode": false
+}
+```
+
+---
+
+### 24. Update User Security
+**Endpoint:** `PUT /security`  
+**Headers:** `Authorization: Bearer <token>`
+
+**Request:**
+```json
+{
+  "requirePin": true,
+  "privacyMode": false
+}
+```
+
+**Response:**
+```json
+{
+  "requirePin": true,
+  "privacyMode": false
+}
+```
+
+---
+
+### 25. Get Current Leverage
+**Endpoint:** `GET /leverage`  
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+```json
+{
+  "leverage": 10
+}
+```
+
+---
+
+### 26. Update Leverage
+**Endpoint:** `PUT /leverage`  
+**Headers:** `Authorization: Bearer <token>`
+
+**Request:**
+```json
+{
+  "leverage": 10
+}
+```
+
+**Response:**
+```json
+{
+  "leverage": 10
+}
+```
+
+---
+
+## Business Logic Notes
+
+### Trading Model (CFD)
+This platform operates as a **Contract for Difference (CFD)** trading platform:
+- **Deposits** = Adding collateral to your wallet (e.g., deposit 1 BTC from Binance)
+- **Orders** = Speculative positions on price movements (e.g., go long on BTC/USDT)
+- Users don't buy actual crypto, they bet on price direction
+- Profits/losses are settled in USDT equivalent
+
+### Order Execution
+- Users can trade any pair using USDT balance as collateral
+- Example: Have 1000 USDT → Can open long/short position on BTC/USDT
+- Margin required = Position Size / Leverage
+
+### KYC Requirements
+- **Demo accounts**: No KYC required, can trade immediately
+- **Live accounts**: KYC approval mandatory for trading and deposits
+- **Withdrawals**: KYC approval mandatory
 
 ---
 
