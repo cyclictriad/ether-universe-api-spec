@@ -1,7 +1,7 @@
 # Trust Wallet dApp - Frontend API Specification (KYC-Enhanced)
 
 **Purpose:** Define all API endpoints the frontend will consume  
-**Base URL:** `https://api.yourapp.com/api/v1`  
+**Base URL:** `https://trade.cradlevoices.com/api/v1/`  
 **Authentication:** JWT Bearer Token (except auth endpoints)
 
 ---
@@ -248,7 +248,6 @@ const signature = await wallet.signMessage(message);
 document_type: "passport" | "national_id" | "drivers_license"
 document_front: [File] (JPEG/PNG, max 10MB)
 document_back: [File] (JPEG/PNG, max 10MB) - Required for national_id and drivers_license
-selfie_photo: [File] (JPEG/PNG, max 10MB) - Required for identity verification
 ```
 
 **Response (Submitted Successfully):**
