@@ -331,7 +331,6 @@ document_back: [File] (JPEG/PNG, max 10MB) - Required for national_id and driver
 ```json
 {
   "user_id": "usr_12345",
-  "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
   "kyc_status": "approved",
   "kyc_verified_at": "2024-06-20T14:30:00Z",
   "first_name": "John",
@@ -349,7 +348,6 @@ document_back: [File] (JPEG/PNG, max 10MB) - Required for national_id and driver
 ```json
 {
   "user_id": "usr_67890",
-  "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
   "kyc_status": "not_submitted",
   "kyc_required": true,
   "first_name": null,
@@ -377,7 +375,6 @@ document_back: [File] (JPEG/PNG, max 10MB) - Required for national_id and driver
 ```json
 {
   "user_id": "usr_12345",
-  "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
   "kyc_status": "approved",
   "kyc_verified_at": "2024-06-20T14:30:00Z",
   "first_name": "John",
@@ -643,7 +640,7 @@ document_back: [File] (JPEG/PNG, max 10MB) - Required for national_id and driver
   "account_id": 3,
   "statistics": [
     [1727789022, 0],
-    [1727789025, 10],
+    [1727789025, 10], //[timestamp, profit_usd]
     [1727789032, -5],
     [1727789042, 15]
   ]
@@ -717,7 +714,7 @@ document_back: [File] (JPEG/PNG, max 10MB) - Required for national_id and driver
   "symbol": "BTC/USD",
   "interval": "1h",
   "price_data": [
-    [1727789022, 100000],
+    [1727789022, 100000], //price_point [timestamp, value_usd]
     [1727789025, 100010],
     [1727789032, 99995],
     [1727789042, 100050]
