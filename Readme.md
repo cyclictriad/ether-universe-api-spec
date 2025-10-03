@@ -635,7 +635,7 @@ document_back: [File] (JPEG/PNG, max 10MB) - Required for national_id and driver
 - `end_date` (optional): ISO 8601 date
 
 **Response:**
-```json
+```js
 {
   "account_id": 3,
   "statistics": [
@@ -708,7 +708,7 @@ document_back: [File] (JPEG/PNG, max 10MB) - Required for national_id and driver
 - `interval` (optional): `1m`, `5m`, `15m`, `1h`, `4h`, `1d` (default: `1h`)
 
 **Response:**
-```json
+```js
 {
   "pair_id": 1,
   "symbol": "BTC/USD",
@@ -820,8 +820,8 @@ document_back: [File] (JPEG/PNG, max 10MB) - Required for national_id and driver
 **Response:**
 ```json
 {
-  "requirePin": false,
-  "privacyMode": false
+  "require_pin": false,
+  "privacy_mode": false
 }
 ```
 
@@ -834,16 +834,16 @@ document_back: [File] (JPEG/PNG, max 10MB) - Required for national_id and driver
 **Request:**
 ```json
 {
-  "requirePin": true,
-  "privacyMode": false
+  "require_pin": true,
+  "privacy_mode": false
 }
 ```
 
 **Response:**
 ```json
 {
-  "requirePin": true,
-  "privacyMode": false
+  "require_pin": true,
+  "privacy_mode": false
 }
 ```
 
